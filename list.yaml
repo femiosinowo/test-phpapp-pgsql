@@ -1,0 +1,168 @@
+apiVersion: v1
+kind: List
+metadata: {}
+items:
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      build: phpapp
+    name: phpapp
+  status:
+    dockerImageRepository: ""
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: phpapp-config
+  data: 
+    postgres.host: "localhost"
+    postgres.port: "5432"
+    postgres.dbname: "phpapp"
+    postgres.username: "postgres"
+    postgres.password: "P@ssw0rd"
+
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    creationTimestamp: null
+    labels:
+      app: phpapp-build
+      name: phpapp
+    name: phpapp-build
+  spec:
+    nodeSelector: null
+    output:
+      to:
+        kind: ImageStreamTag
+        name: phpapp:latest
+    postCommit: {}
+    resources: {}
+    runPolicy: Serial
+    source:
+      git:
+        uri: https://github.com/femiosinowo/test-phpapp-pgsql.git
+      type: Git
+    strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: php:5.6-apache
+          namespace: openshift
+      type: Source
+    triggers: []
+  status:
+    lastVersion: 0
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    labels:
+      build: phpapp
+    name: phpapp
+  status:
+    dockerImageRepository: ""
+
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    creationTimestamp: null
+    generation: 1
+    labels:
+      app: phpapp
+      phpapp: "true"
+    name: phpapp
+  spec:
+    replicas: 1
+    selector:
+      app: phpapp
+      phpapp: "true"
+    strategy:
+      resources: {}
+      rollingParams:
+        intervalSeconds: 1
+        maxSurge: 25%
+        maxUnavailable: 25%
+        timeoutSeconds: 600
+        updatePeriodSeconds: 1
+      type: Rolling
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: phpapp
+          phpapp: "true"
+      spec:
+        containers:
+        - env:
+          - name: DB_HOST
+            valueFrom: 
+              configMapKeyRef: 
+                name: phpapp-config
+                key: postgres.host
+          - name: DB_PORT
+            valueFrom: 
+              configMapKeyRef: 
+                name: phpapp-config
+                key: postgres.port
+          - name: DB_NAME
+            valueFrom: 
+              configMapKeyRef: 
+                name: phpapp-config
+                key: postgres.dbname
+          - name: DB_USER
+            valueFrom: 
+              configMapKeyRef: 
+                name: phpapp-config
+                key: postgres.user
+          - name: DB_PASSWORD
+            valueFrom: 
+              configMapKeyRef: 
+                name: phpapp-config
+                key: postgres.password
+          image: ' '
+          imagePullPolicy: Always
+          name: phpapp
+          ports:
+          - containerPort: 80
+            protocol: TCP
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          #volumeMounts:
+          #- mountPath: /redis-master-data
+          #  name: data
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        #volumes:
+        #- emptyDir: {}
+        #  name: data
+    test: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - phpapp
+        from:
+          kind: ImageStreamTag
+          name: phpapp:latest
+      type: ImageChange
+  status: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      name: phpapp
+      role: service
+    name: phpapp
+  spec:
+    ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+    selector:
+      app: "phpapp"
+    sessionAffinity: None
+    type: ClusterIP
+
